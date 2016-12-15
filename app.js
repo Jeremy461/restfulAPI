@@ -1,5 +1,6 @@
 var express = require('express'),
-    mongoose = require('mongoose');
+    mongoose = require('mongoose'),
+    bodyParser = require('body-parser');
 
 var db = mongoose.connect('mongodb://localhost/songAPI');
 
@@ -9,37 +10,12 @@ var app = express();
 
 var port = process.env.PORT || 3000;
 
-var songRouter = express.Router();
+app.use(bodyParser.json());
+app.use(bodyParser.urlencoded({extended:true}));
 
-songRouter.route('/Songs')
-    .get(function(req,res){
+songRouter = require('./Routes/songRoutes')(Song);
 
-        var query = [];
-
-        if (req.query.genre)
-        {
-            query.genre = req.query.genre;
-        }
-        Song.find(query, function(err,songs){
-            if(err)
-                res.status(500).send(err);
-            else
-                res.json(songs);
-        });
-    });
-
-songRouter.route('/Songs/:songId')
-    .get(function(req,res){
-
-        Song.findById(req.params.bookId, function(err,song){
-            if(err)
-                res.status(500).send(err);
-            else
-                res.json(song);
-        });
-    });
-
-app.use('/api', songRouter);
+app.use('/api/songs', songRouter);
 
 app.get('/', function(req, res){
     res.send('welcome to my API!');
