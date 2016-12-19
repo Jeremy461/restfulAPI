@@ -30,69 +30,100 @@ var songController = function(Song){
         res.end();
     };
 
-    var get = function(req,res){
+    var get = function(req,res,next){
 
-        if (!req.accepts('json')) {
-            res.status(404)
-        }
+        var page = parseInt(req.query.start) || 1;
+        Song.find().exec((err, countData) => {
+            if (err) return next(err);
+            var countItems = countData.length;
 
-        var query = {};
+            var limit = parseInt(req.query.limit) || countItems;
 
-        if (req.query.genre)
-        {
-            query.genre = req.query.genre;
-        }
+            var query = {};
 
+            var exclude = {__v: 0};
+            Song.find({}, exclude)
+                .paginate(page, limit)
+                .exec((err, data) => {
+                    if (err) {
+                        return next(err)
+                    } else {
+                        if (limit > countItems)
+                            limit = countItems;
 
+                        var totalPages = Math.ceil(countItems / limit);
+                    }
 
-        Song.find(query, function(err,songs){
-            if(err)
-                res.status(500).send(err);
-            else {
+                    if (err) {
+                        res.status(500).send(err);
+                    } else {
+                        if (!req.accepts('json')) {
+                            res.status(404).send(err)
+                        } else {
 
-                var items = query.items = [];
-                songs.forEach(function(element, index, array){
-                    var newSong = element.toJSON();
-                    newSong._links = {};
+                            if (totalPages <= 1) {
+                                newPagePrev = 1;
+                                newPageNext = 1;
+                            }
 
-                    newSong._links.self = {};
-                    newSong._links.self.href = 'http://' + req.headers.host + '/api/songs/' + newSong._id;
+                            if (countItems < 1) {
+                                newPageNext = 1;
+                                newPagePrev = 1;
+                                totalPages = 1;
+                            }
 
-                    newSong._links.collection = {};
-                    newSong._links.collection.href = 'http://' + req.headers.host + '/api/songs';
+                            if (page < totalPages) {
+                                newPageNext = page + 1;
+                            }
 
-                    items.push(newSong);
+                            if (page > 1) {
+                                newPagePrev = page - 1;
+                            }
+                            var items = query.items = [];
+                            data.forEach(function (element, index, array) {
+                                var newSong = element.toJSON();
+                                newSong._links = {};
+
+                                newSong._links.self = {};
+                                newSong._links.self.href = 'http://' + req.headers.host + '/api/songs/' + newSong._id;
+
+                                newSong._links.collection = {};
+                                newSong._links.collection.href = 'http://' + req.headers.host + '/api/songs';
+
+                                items.push(newSong);
+                            });
+
+                            var links = query._links = {};
+                            links.self = {};
+                            links.self.href = 'http://' + req.headers.host + '/api/songs/';
+
+                            var pagination = query.pagination = {};
+                            pagination.currentPage = page;
+                            pagination.currentItems = limit;
+                            pagination.totalPages = totalPages;
+                            pagination.totalItems = countItems;
+
+                            pagination._links = {};
+
+                            pagination._links.first = {};
+                            pagination._links.first.page = 1;
+                            pagination._links.first.href = 'http://' + req.headers.host + '/api/songs/?start=' + 1 + '&limit=' + limit;
+
+                            pagination._links.last = {};
+                            pagination._links.last.page = 1;
+                            pagination._links.last.href = 'http://' + req.headers.host + '/api/songs/?start=' + totalPages + '&limit='+ limit;
+
+                            pagination._links.previous = {};
+                            pagination._links.previous.page = 1;
+                            pagination._links.previous.href = 'http://' + req.headers.host + '/api/songs/?start=' + newPagePrev + '&limit=' + limit;
+
+                            pagination._links.next = {};
+                            pagination._links.next.page = 1;
+                            pagination._links.next.href = 'http://' + req.headers.host + '/api/songs/?start=' + newPageNext + '&limit=' + limit;
+                            res.json(query);
+                        }
+                    }
                 });
-
-                var links = query._links = {};
-                links.self = {};
-                links.self.href = 'http://' + req.headers.host + '/api/songs/';
-
-                var pagination = query.pagination = {};
-                pagination.currentPage = 1;
-                pagination.currentItems = 2;
-                pagination.totalPages = 1;
-                pagination.totalItems = 2;
-
-                pagination._links = {};
-
-                pagination._links.first = {};
-                pagination._links.first.page = 1;
-                pagination._links.first.href = 'http://' + req.headers.host + 'api/songs/?start=1&limit=2';
-
-                pagination._links.last = {};
-                pagination._links.last.page = 1;
-                pagination._links.last.href = 'http://' + req.headers.host + 'api/songs/?start=1&limit=2';
-
-                pagination._links.previous = {};
-                pagination._links.previous.page = 1;
-                pagination._links.previous.href = 'http://' + req.headers.host + 'api/songs/?start=1&limit=2';
-
-                pagination._links.next = {};
-                pagination._links.next.page = 1;
-                pagination._links.next.href = 'http://' + req.headers.host + 'api/songs/?start=1&limit=2';
-                res.json(query);
-            }
         });
     };
 
